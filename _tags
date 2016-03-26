@@ -1,0 +1,4 @@
+true: package(core)
+true: package(tsdl)
+true: package(result)
+true: bin_annot
