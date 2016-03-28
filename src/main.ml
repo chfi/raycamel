@@ -35,6 +35,11 @@ let tiles =
     [|0;0;0;0;0;0;0;0;0;0;0;0|];
   |]
 
+
+type grid_point = { gx : int; gz : int }
+type world_point = { wx : float; wz : float }
+type angle = float
+
 type map =
   { width : int;
     depth : int;
@@ -42,6 +47,14 @@ type map =
     g_depth : float;
     g_height : float;
     grid : int array array; }
+
+type intersection =
+  { point : world_point;
+    normal : world_point;
+    dist : float;
+    wall_type : int;
+  }
+
 
 let level =
   { width = 12;
@@ -51,9 +64,6 @@ let level =
     g_height = 64.;
     grid = tiles }
 
-type grid_point = { gx : int; gz : int }
-type world_point = { wx : float; wz : float }
-type angle = float
 
 let p = ref { wx = 736.; wz = 288.; }
 let v = ref 0.0
@@ -85,11 +95,7 @@ let rec norm_angle a =
   let a' = (atan2 (sin a) (cos a)) in
   if a' < 0. then a' +. two_pi else a'
 
-(* return int * float * ( float * float ) option, where the int is the
-   "color" of the wall collided with, and the float is the distance to that
-   wall; None is returned if there was no intersection. The last float pair is
-   a normalized normal vector to the wall hit *)
-
+(* return type is intersection; see above *)
 let find_intersection m (wp : world_point) a =
   let a = norm_angle a in
 
@@ -153,7 +159,10 @@ let find_intersection m (wp : world_point) a =
       let gp = level.grid.(gz).(gx) in
       if gp <> 0 then
         let dist = (((x -. wp.wx) ** 2.) +. ((z -. wp.wz) ** 2.)) ** 0.5 in
-        Some (gp, dist, (0.,1.))
+        Some { point = { wx = x; wz = z};
+               normal = { wx = 1.; wz = 0.};
+               dist = dist;
+               wall_type = gp }
       else
         check_h_ray (i+1)
   in
@@ -177,7 +186,10 @@ let find_intersection m (wp : world_point) a =
     let gp = m.grid.(gz).(gx) in
     if gp <> 0 then
       let dist = (((x -. wp.wx) ** 2.) +. ((z -. wp.wz) ** 2.)) ** 0.5 in
-      Some (gp, dist, (1.,0.))
+        Some { point = { wx = x; wz = z};
+               normal = { wx = 0.; wz = 1.};
+               dist = dist;
+               wall_type = gp }
     else
       check_v_ray (i+1)
   in
@@ -191,8 +203,8 @@ let find_intersection m (wp : world_point) a =
   match (h_intersect, v_intersect) with
   | (None,v) -> v
   | (h,None) -> h
-  | (Some (p1,dh,n1), Some (p2,dv,n2)) ->
-    if dh < dv then Some (p1,dh,n1) else Some (p2,dv,n2)
+  | (Some h, Some v) ->
+    if h.dist < v.dist then Some h else Some v
 
 
 (* returns (angle * intersection) list *)
@@ -207,11 +219,11 @@ let cast_rays m (wp : world_point) a =
                       norm_angle (min +. da))) in
   let intersections = List.map angles
       ~f:(fun a' ->
-          let is = find_intersection m wp a' in
-          match is with
+          match find_intersection m wp a' with
           (* d' is the distance with distortion removed *)
-          | Some (g,d,(x,y)) -> let d' = d *. (cos (a' -. a)) in
-            (a', Some (g,d',(x,y)))
+          | Some is -> let d' = is.dist *. (cos (a' -. a)) in
+            (a', Some { point = is.point; normal = is.normal;
+            dist = d'; wall_type = is.wall_type })
           | None -> (a', None))
   in
   intersections
@@ -341,11 +353,11 @@ let topdown () = match Sdl.init Sdl.Init.video with
           let intersects = cast_rays level !p !a in
 
           List.iteri intersects
-            ~f:(fun col (angle,is) ->
-                match is with
+            ~f:(fun col (angle,is_opt) ->
+                match is_opt with
                 | None -> ()
-                | Some (i,d,(_,_)) ->
-                  let (rx,ry) = polar_to_cart (angle, d) in
+                | Some is ->
+                  let (rx,ry) = polar_to_cart (angle, is.dist) in
                   let px = int_of_float !p.wx in
                   let py = int_of_float !p.wz in
                   let rx = int_of_float rx in
@@ -387,22 +399,22 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                  wz = !p.wz +. ((sin !a) *. !v);};
 
           (* strafing *)
-          p := { wx = !p.wx +. ((cos (!a +. (pi/.2))) *. !ds);
+          p := { wx = !p.wx +. ((cos (!a +. (pi/.2.))) *. !ds);
                  wz = !p.wz +. ((sin (!a +. (pi/.2.))) *. !ds)};
 
           ignore (Sdl.render_clear r);
           let intersects = cast_rays level !p !a in
           List.iteri intersects
-            ~f:(fun col (angle,is) ->
-                match is with
+            ~f:(fun col (angle,is_opt) ->
+                match is_opt with
                 | None -> ()
-                | Some (i,d,(nx,ny)) ->
+                | Some is ->
                   let mid = proj_height / 2 in
                   let wall_height =
                     int_of_float (Float.round_down
-                                    (level.g_height *. proj_dist) /. d) in
-                  let s = if nx = 1. then 1 else 2 in
-                  let color = grid_to_shaded_color i s in
+                                    (level.g_height *. proj_dist) /. is.dist) in
+                  let s = if is.normal.wx = 1. then 1 else 2 in
+                  let color = grid_to_shaded_color is.wall_type s in
                   render_column ~renderer:r ~h:proj_height ~x:col
                     ~top:(mid - (wall_height / 2))
                     ~btm:(mid + (wall_height / 2))  ~color:color);
