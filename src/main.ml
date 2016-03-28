@@ -102,7 +102,7 @@ let find_intersection m (wp : world_point) a =
   (* however, since the coordinate system has y increasing southward,
      pi radians is to the south. *)
   let h_z_orig = if (a > pi)
-    then ((Float.round_down (wp.wz /. m.g_depth)) *. m.g_depth) -. 1.
+    then ((Float.round_down (wp.wz /. m.g_depth)) *. m.g_depth) -. 0.001
     else ((Float.round_down (wp.wz /. m.g_depth)) *. m.g_depth) +. 64.
   in
   let h_x_orig = wp.wx +. ((wp.wz -. h_z_orig) /. (tan (-. a))) in
@@ -123,7 +123,7 @@ let find_intersection m (wp : world_point) a =
   (* if looking west, round down and look at the first block in the
      negative direction *)
   let v_x_orig = if (a > (pi /. 2.)) && (a < ((3. *. pi) /. 2.))
-    then ((Float.round_down (wp.wx /. m.g_width)) *. m.g_width) -. 1.
+    then ((Float.round_down (wp.wx /. m.g_width)) *. m.g_width) -. 0.001
     else ((Float.round_down (wp.wx /. m.g_width)) *. m.g_width) +. 64.
   in
   let v_z_orig = wp.wz +. ((wp.wx -. v_x_orig) *. (tan (-. a))) in
