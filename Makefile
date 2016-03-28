@@ -27,6 +27,7 @@ sanity:
 # check that packages can be found
 			ocamlfind query core 
 			ocamlfind query tsdl 
+			ocamlfind query tsdl_image
 			ocamlfind query result 
 
 # test: 		native

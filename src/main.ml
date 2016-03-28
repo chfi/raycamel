@@ -1,5 +1,6 @@
 open Core.Std
 open Tsdl
+open Tsdl_image
 
 let pi = 4.0 *. atan 1.0
 let two_pi = 2. *. pi

@@ -1,4 +1,5 @@
 true: package(core)
 true: package(tsdl)
+true: package(tsdl_image)
 true: package(result)
 true: bin_annot
