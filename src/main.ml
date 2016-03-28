@@ -13,6 +13,14 @@ let r_angle = fov_r /. (float_of_int proj_width)
 
 let p_height = 32
 
+(* raycamel texture type,
+   textureh is the texture used for horizontal walls,
+   texturev that for vertical walls *)
+type rc_texture = { textureh : Tsdl.Sdl.texture;
+                   texturev : Tsdl.Sdl.texture;
+                   tw : int;
+                   th : int;
+                 }
 
 (* The coordinates used are, for the map/grid, origin top left. *)
 
@@ -244,6 +252,30 @@ let draw_rect r x1 y1 x2 y2 =
       ~w:(Int.abs (x2 - x1)) ~h:(Int.abs (y2 - y1))
   in
   ignore (Sdl.render_fill_rect r (Some rect))
+
+
+(* returns the rectangle that will be used to copy from the texture
+   to the renderer *)
+let texture_rect_of_intersect is txt =
+  (* TODO: fix this hardcoded garbage; 64 should be level.tile_width (or depth,
+     depending on intersection! *)
+  let txt_col_w = (float_of_int txt.tw) /. 64. in
+  let txt_col = match is.normal with
+    (* in this case we hit a wall vertically, so we want
+       to look at the intersection's X coordinate *)
+  | {wx=1.;wz=0.} -> Float.mod_float (Float.round_down is.point.wx) 64.
+  | {wx=0.;wz=1.} -> Float.mod_float (Float.round_down is.point.wz) 64.
+  | _ -> 0.
+  in
+  let start = int_of_float (txt_col *. txt_col_w) in
+  Sdl.Rect.create ~x:(start) ~y:0
+    (* this could probably be handled better as well, instead of just
+       rounding ... *)
+    ~w:(int_of_float (Float.round_nearest txt_col_w)) ~h:txt.th
+
+let rect_of_column ~x ~top ~btm =
+  Sdl.Rect.create ~x:x ~y:top ~w:1 ~h:(btm-top)
+
 
 (* draws a single column based on calculated top and bottom pixels of the wall
    (if any) the ray struck *)
