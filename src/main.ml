@@ -7,7 +7,7 @@ let proj_width = 640
 let proj_height = 400
 let fov_d = 60
 let fov_r = pi /. 3.
-let proj_dist = 520
+let proj_dist = (float_of_int (proj_width / 2)) /. (tan (fov_r /. 2.))
 let r_angle = fov_r /. (float_of_int proj_width)
 
 let p_height = 32
@@ -40,6 +40,7 @@ type map =
     depth : int;
     g_width : float;
     g_depth : float;
+    g_height : float;
     grid : int array array; }
 
 let level =
@@ -47,6 +48,7 @@ let level =
     depth = 12;
     g_width = 64.;
     g_depth = 64.;
+    g_height = 64.;
     grid = tiles }
 
 type grid_point = { gx : int; gz : int }
@@ -57,9 +59,11 @@ let p = ref { wx = 736.; wz = 288.; }
 let v = ref 0.0
 let a = ref pi
 let da = ref 0.0
+(* current strafing speed *)
+let ds = ref 0.0
 
-let run_speed = 1.
-let turn_speed = 0.02
+let run_speed = 2.
+let turn_speed = 0.015
 
 (* map coordinates - the coordinates in the tile map *)
 (* world coordinates - the coordinates in the world, that the player will use;
@@ -135,8 +139,10 @@ let find_intersection m (wp : world_point) a =
     let x = h_x_orig +. (h_xa *. (float_of_int i)) in
     let z = h_z_orig +. (h_za *. (float_of_int i)) in
     (* if we're looking outside the map, we won't hit anything, so return None *)
-    if x < 0. || x > (float_of_int m.width) *. m.g_width ||
-       z < 0. || z > (float_of_int m.depth) *. m.g_depth
+    if (h_xa > 0. && x > (float_of_int m.width) *. m.g_width) ||
+       (h_xa < 0. && x < 0.) ||
+       (h_za > 0. && z > (float_of_int m.depth) *. m.g_depth) ||
+       (h_za < 0. && z < 0.)
     then
       None
     else
@@ -156,8 +162,10 @@ let find_intersection m (wp : world_point) a =
   let rec check_v_ray i =
     let x = v_x_orig +. (v_xa *. (float_of_int i)) in
     let z = v_z_orig +. (v_za *. (float_of_int i)) in
-    if x < 0. || x > (float_of_int m.width) *. m.g_width ||
-       z < 0. || z > (float_of_int m.depth) *. m.g_depth
+    if (v_xa > 0. && x > (float_of_int m.width) *. m.g_width) ||
+       (v_xa < 0. && x < 0.) ||
+       (v_za > 0. && z > (float_of_int m.depth) *. m.g_depth) ||
+       (v_za < 0. && z < 0.)
     then
       None
     else
@@ -287,14 +295,18 @@ let process_event e =
   | true -> match E.(enum (get e typ)) with
     | `Quit -> running := false
     | `Key_down when key_scancode e = `Escape -> running := false
-    | `Key_down when key_scancode e = `Up -> v := run_speed
-    | `Key_down when key_scancode e = `Down -> v := -. run_speed
-    | `Key_down when key_scancode e = `Left -> da := -. turn_speed
-    | `Key_down when key_scancode e = `Right -> da := turn_speed
-    | `Key_up when key_scancode e = `Up -> v := 0.
-    | `Key_up when key_scancode e = `Down -> v := 0.
-    | `Key_up when key_scancode e = `Left -> da := 0.
-    | `Key_up when key_scancode e = `Right -> da := 0.
+    | `Key_down when key_scancode e = `W -> v := run_speed
+    | `Key_down when key_scancode e = `S -> v := -. run_speed
+    | `Key_down when key_scancode e = `Q -> da := -. turn_speed
+    | `Key_down when key_scancode e = `E -> da := turn_speed
+    | `Key_down when key_scancode e = `A -> ds := -. run_speed
+    | `Key_down when key_scancode e = `D -> ds := run_speed
+    | `Key_up when key_scancode e = `W -> v := 0.
+    | `Key_up when key_scancode e = `S -> v := 0.
+    | `Key_up when key_scancode e = `Q -> da := 0.
+    | `Key_up when key_scancode e = `E -> da := 0.
+    | `Key_up when key_scancode e = `A -> ds := 0.
+    | `Key_up when key_scancode e = `D -> ds := 0.
     | _ -> ()
 
 
@@ -374,6 +386,10 @@ let raycaster () = match Sdl.init Sdl.Init.video with
           p := { wx = !p.wx +. ((cos !a) *. !v);
                  wz = !p.wz +. ((sin !a) *. !v);};
 
+          (* strafing *)
+          p := { wx = !p.wx +. ((cos (!a +. (pi/.2))) *. !ds);
+                 wz = !p.wz +. ((sin (!a +. (pi/.2.))) *. !ds)};
+
           ignore (Sdl.render_clear r);
           let intersects = cast_rays level !p !a in
           List.iteri intersects
@@ -383,7 +399,8 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                 | Some (i,d,(nx,ny)) ->
                   let mid = proj_height / 2 in
                   let wall_height =
-                    int_of_float (Float.round_down (64. *. 277.) /. d) in
+                    int_of_float (Float.round_down
+                                    (level.g_height *. proj_dist) /. d) in
                   let s = if nx = 1. then 1 else 2 in
                   let color = grid_to_shaded_color i s in
                   render_column ~renderer:r ~h:proj_height ~x:col
