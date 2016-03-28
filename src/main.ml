@@ -421,6 +421,29 @@ let raycaster () = match Sdl.init Sdl.Init.video with
       match Sdl.create_renderer w with
       | Error (`Msg e) -> Sdl.log "Create renderer error: %s" e; exit 1
       | Ok r ->
+
+        let txt1 = {
+          textureh = Option.value_exn (Tsdl_image.Image.load_texture r "brick.jpg");
+          texturev = Option.value_exn (Tsdl_image.Image.load_texture r "brick2.png");
+          tw = 64;
+          th = 64;
+        }
+        in
+        let txt2 = {
+          textureh = Option.value_exn (Tsdl_image.Image.load_texture r "steel.jpg");
+          texturev = Option.value_exn (Tsdl_image.Image.load_texture r "steel2.jpg");
+          tw = 64;
+          th = 64;
+        }
+        in
+        let txt3 = {
+          textureh = Option.value_exn (Tsdl_image.Image.load_texture r "blue.jpg");
+          texturev = Option.value_exn (Tsdl_image.Image.load_texture r "blue2.jpg");
+          tw = 64;
+          th = 64;
+        }
+        in
+
         while !running do
 
           let e = Sdl.Event.create () in
@@ -436,6 +459,14 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                  wz = !p.wz +. ((sin (!a +. (pi/.2.))) *. !ds)};
 
           ignore (Sdl.render_clear r);
+
+          (* draw flat-shaded ceiling *)
+          set_color r (160, 160, 200);
+          draw_rect r 0 0 proj_width (proj_height / 2);
+          (* and floor *)
+          set_color r (100, 100, 100);
+          draw_rect r 0 (proj_height / 2) proj_width proj_height;
+
           let intersects = cast_rays level !p !a in
           List.iteri intersects
             ~f:(fun col (angle,is_opt) ->
@@ -448,9 +479,31 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                                     (level.g_height *. proj_dist) /. is.dist) in
                   let s = if is.normal.wx = 1. then 1 else 2 in
                   let color = grid_to_shaded_color is.wall_type s in
-                  render_column ~renderer:r ~h:proj_height ~x:col
-                    ~top:(mid - (wall_height / 2))
-                    ~btm:(mid + (wall_height / 2))  ~color:color);
+                  (* let ceil_btm = mid - (wall_height / 2) in *)
+                  (* let floor_top = mid + (wall_height /2) in *)
+                  let rct = rect_of_column ~x:col
+                      ~top:(mid - (wall_height / 2))
+                      ~btm:(mid + (wall_height / 2))
+                  in
+
+
+                  let txtr = match is.wall_type with
+                    | 1 -> txt1
+                    | 2 -> txt2
+                    | 3 -> txt3
+                    | _ -> txt1
+                  in
+
+
+                  let tx_rect = texture_rect_of_intersect is txtr in
+                  if s = 1 then
+                    ignore (Sdl.render_copy ~src:tx_rect ~dst:rct r txtr.textureh)
+                  else
+                    ignore (Sdl.render_copy ~src:tx_rect ~dst:rct r txtr.texturev)
+                      ;
+
+              );
+
           Sdl.render_present r;
 
         done;
