@@ -1,7 +1,6 @@
 open Core.Std
 open Tsdl
 
-
 let pi = 4.0 *. atan 1.0
 let two_pi = 2. *. pi
 let proj_width = 640
@@ -82,8 +81,8 @@ let rec norm_angle a =
   let a' = (atan2 (sin a) (cos a)) in
   if a' < 0. then a' +. two_pi else a'
 
-(* return grid_point * float * ( float * float ) option, where grid_point is the
-   coordinates of the wall collided with, and the float is the distance to that
+(* return int * float * ( float * float ) option, where the int is the
+   "color" of the wall collided with, and the float is the distance to that
    wall; None is returned if there was no intersection. The last float pair is
    a normalized normal vector to the wall hit *)
 
@@ -199,7 +198,14 @@ let cast_rays m (wp : world_point) a =
                       let da = (float_of_int i) *. r_angle in
                       norm_angle (min +. da))) in
   let intersections = List.map angles
-      ~f:(fun a' -> (a',find_intersection m wp a')) in
+      ~f:(fun a' ->
+          let is = find_intersection m wp a' in
+          match is with
+          (* d' is the distance with distortion removed *)
+          | Some (g,d,(x,y)) -> let d' = d *. (cos (a' -. a)) in
+            (a', Some (g,d',(x,y)))
+          | None -> (a', None))
+  in
   intersections
 
 
@@ -272,9 +278,7 @@ let cart_to_polar (x,y) =
   let l = ((x**2.) +. (y**2.)) ** 0.5 in
   (a,l)
 
-
-(* why does this not block, but the exact same code when written
-   inline in the while loop does block? *)
+(* TODO: factor out player update into separate function *)
 let process_event e =
   let module E = Sdl.Event in
   let key_scancode e = Sdl.Scancode.enum E.(get e keyboard_scancode) in
@@ -292,6 +296,7 @@ let process_event e =
     | `Key_up when key_scancode e = `Left -> da := 0.
     | `Key_up when key_scancode e = `Right -> da := 0.
     | _ -> ()
+
 
 
 
@@ -348,7 +353,7 @@ let topdown () = match Sdl.init Sdl.Init.video with
         exit 0
 
 
-
+(* TODO: factor out player update into separate function *)
 let raycaster () = match Sdl.init Sdl.Init.video with
   | Error (`Msg e) -> Sdl.log "Init error: %s" e; exit 1
   | Ok () ->
