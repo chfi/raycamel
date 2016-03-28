@@ -27,6 +27,10 @@ type rc_texture = { textureh : Tsdl.Sdl.texture;
 (* TODO: pretty silly to just wrap everything in ignore... there's a better way,
    i'm sure, but i don't know the language well enough *)
 
+
+(* TODO: read map from file *)
+
+(* TODO: give map tiles extra info, such as floor and ceiling height *)
 (* tiles.(row).(column) *)
 let tiles =
   [|
@@ -331,7 +335,8 @@ let cart_to_polar (x,y) =
   let l = ((x**2.) +. (y**2.)) ** 0.5 in
   (a,l)
 
-(* TODO: factor out player update into separate function *)
+(* TODO: factor out player update into separate function, and maybe moving/turning
+   etc. into its own record *)
 let process_event e =
   let module E = Sdl.Event in
   let key_scancode e = Sdl.Scancode.enum E.(get e keyboard_scancode) in
@@ -353,8 +358,6 @@ let process_event e =
     | `Key_up when key_scancode e = `A -> ds := 0.
     | `Key_up when key_scancode e = `D -> ds := 0.
     | _ -> ()
-
-
 
 
 (* start the topdown view *)
@@ -409,6 +412,9 @@ let topdown () = match Sdl.init Sdl.Init.video with
         Sdl.quit ();
         exit 0
 
+(* TODO: factor out texture loading; create the texture outside the main function
+   but load it later; maybe using a hashtable or something along with options
+   to create a texture loader/manager, and map from map to texture *)
 
 (* TODO: factor out player update into separate function *)
 let raycaster () = match Sdl.init Sdl.Init.video with
@@ -460,6 +466,8 @@ let raycaster () = match Sdl.init Sdl.Init.video with
 
           ignore (Sdl.render_clear r);
 
+          (* TODO: Factor out rendering function *)
+          (* TODO: Add sprite/billboard support *)
           (* draw flat-shaded ceiling *)
           set_color r (160, 160, 200);
           draw_rect r 0 0 proj_width (proj_height / 2);
@@ -478,14 +486,10 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                     int_of_float (Float.round_down
                                     (level.g_height *. proj_dist) /. is.dist) in
                   let s = if is.normal.wx = 1. then 1 else 2 in
-                  let color = grid_to_shaded_color is.wall_type s in
-                  (* let ceil_btm = mid - (wall_height / 2) in *)
-                  (* let floor_top = mid + (wall_height /2) in *)
                   let rct = rect_of_column ~x:col
                       ~top:(mid - (wall_height / 2))
                       ~btm:(mid + (wall_height / 2))
                   in
-
 
                   let txtr = match is.wall_type with
                     | 1 -> txt1
@@ -493,7 +497,6 @@ let raycaster () = match Sdl.init Sdl.Init.video with
                     | 3 -> txt3
                     | _ -> txt1
                   in
-
 
                   let tx_rect = texture_rect_of_intersect is txtr in
                   if s = 1 then
@@ -512,4 +515,5 @@ let raycaster () = match Sdl.init Sdl.Init.video with
         Sdl.quit ();
         exit 0
 
+(* TODO: add command line parameter to allow starting the topdown mode *)
 let () = raycaster ()
